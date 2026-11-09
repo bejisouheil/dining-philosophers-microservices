@@ -1,0 +1,8 @@
+# Fins de ligne identiques pour toute l'équipe, quel que soit l'OS
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+*.jar binary
+*.png binary
+*.pdf binary

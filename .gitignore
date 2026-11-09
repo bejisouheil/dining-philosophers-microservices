@@ -1,0 +1,28 @@
+# Maven
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+
+# Logs et traces locales
+*.log
+logs/
+
+# Secrets et configuration locale
+.env
+.env.*
+application-local.yml
+
+# Sujet du projet : il appartient à l'enseignant, ne pas le publier
+projet.pdf
+sujet*.pdf
+
+# Système
+.DS_Store
+Thumbs.db

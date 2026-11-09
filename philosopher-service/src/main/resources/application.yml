@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: philosopher-service
+
+server:
+  # Lancer plusieurs philosophes : donner un PORT différent à chaque instance.
+  port: ${PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
