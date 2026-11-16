@@ -5,6 +5,7 @@
 #                           supervised-locked, token, zookeeper
 #   EVENTS=kafka            transport des événements : kafka ou http
 #   RACE_WINDOW_MS=0        élargit la fenêtre de course du superviseur (démonstration des failles)
+#   THINK_MIN_MS, THINK_MAX_MS   temps de réflexion des philosophes (500 et 1500 ms par défaut)
 #
 # Tableau de bord : http://localhost:8090      Prometheus : http://localhost:9090
 # Grafana : http://localhost:3000 (profil « observability »)
@@ -29,6 +30,9 @@ x-philosopher: &philosopher
     <<: *common-env
     PHILOSOPHER_MODE: ${MODE:-token}
     PHILOSOPHER_COUNT: 5
+    # Temps de réflexion : le mettre à 0 rend l'interblocage du mode naïf quasi immédiat.
+    PHILOSOPHER_THINK_MIN_MS: ${THINK_MIN_MS:-500}
+    PHILOSOPHER_THINK_MAX_MS: ${THINK_MAX_MS:-1500}
     # L'identifiant du philosophe est lu à la fin du nom d'hôte (philosopher-3 → 3).
     PHILOSOPHER_PEER_URL_TEMPLATE: http://philosopher-{id}:8081
     PHILOSOPHER_MONITOR_URL: http://monitor:8090
