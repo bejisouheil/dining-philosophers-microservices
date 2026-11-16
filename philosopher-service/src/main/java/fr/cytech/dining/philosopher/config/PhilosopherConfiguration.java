@@ -16,6 +16,9 @@ import fr.cytech.dining.philosopher.core.PhilosopherLoop;
 import fr.cytech.dining.philosopher.core.SpoiledStrategy;
 import fr.cytech.dining.philosopher.events.EventPublisher;
 import fr.cytech.dining.philosopher.events.HttpEventPublisher;
+import fr.cytech.dining.philosopher.supervised.NaiveSupervisedStrategy;
+import fr.cytech.dining.philosopher.supervised.PairSupervisedStrategy;
+import fr.cytech.dining.philosopher.supervised.SupervisorClient;
 import io.micrometer.core.instrument.MeterRegistry;
 
 /** Assemble le philosophe : identité, horloge, envoi des événements, stratégie, boucle. */
@@ -47,11 +50,26 @@ public class PhilosopherConfiguration {
     }
 
     @Bean
-    DiningStrategy diningStrategy(PhilosopherProperties properties) {
+    DiningStrategy diningStrategy(PhilosopherProperties properties, PhilosopherIdentity identity,
+                                  LamportClock clock) {
+        int id = identity.id();
+        int count = identity.count();
         return switch (properties.mode()) {
             case SPOILED -> new SpoiledStrategy();
+            case SUPERVISED_NAIVE -> new NaiveSupervisedStrategy(supervisorClient(properties, clock, id), id,
+                    count, properties.pollMs());
+            case SUPERVISED_UNSAFE -> new PairSupervisedStrategy(supervisorClient(properties, clock, id),
+                    "unsafe", id, count, properties.pollMs());
+            case SUPERVISED_LOCKED -> new PairSupervisedStrategy(supervisorClient(properties, clock, id),
+                    "locked", id, count, properties.pollMs());
             default -> throw new IllegalStateException("Mode pas encore disponible : " + properties.mode());
         };
+    }
+
+    private static SupervisorClient supervisorClient(PhilosopherProperties properties, LamportClock clock,
+                                                     int philosopherId) {
+        return new SupervisorClient(HttpSupport.restClient(properties.supervisorUrl(),
+                Duration.ofMillis(properties.requestTimeoutMs())), clock, philosopherId);
     }
 
     @Bean(destroyMethod = "stop")
