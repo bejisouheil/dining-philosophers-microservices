@@ -2,6 +2,7 @@ package fr.cytech.dining.philosopher.config;
 
 import java.time.Duration;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationListener;
@@ -12,6 +13,7 @@ import org.springframework.core.env.Environment;
 import fr.cytech.dining.common.HttpSupport;
 import fr.cytech.dining.common.LamportClock;
 import fr.cytech.dining.philosopher.core.DiningStrategy;
+import fr.cytech.dining.philosopher.core.ForkAssignment;
 import fr.cytech.dining.philosopher.core.PhilosopherLoop;
 import fr.cytech.dining.philosopher.core.SpoiledStrategy;
 import fr.cytech.dining.philosopher.events.EventPublisher;
@@ -19,6 +21,9 @@ import fr.cytech.dining.philosopher.events.HttpEventPublisher;
 import fr.cytech.dining.philosopher.supervised.NaiveSupervisedStrategy;
 import fr.cytech.dining.philosopher.supervised.PairSupervisedStrategy;
 import fr.cytech.dining.philosopher.supervised.SupervisorClient;
+import fr.cytech.dining.philosopher.token.TokenNode;
+import fr.cytech.dining.philosopher.token.TokenStrategy;
+import fr.cytech.dining.philosopher.zookeeper.ZooKeeperStrategy;
 import io.micrometer.core.instrument.MeterRegistry;
 
 /** Assemble le philosophe : identité, horloge, envoi des événements, stratégie, boucle. */
@@ -51,7 +56,7 @@ public class PhilosopherConfiguration {
 
     @Bean
     DiningStrategy diningStrategy(PhilosopherProperties properties, PhilosopherIdentity identity,
-                                  LamportClock clock) {
+                                  LamportClock clock, ObjectProvider<TokenNode> tokenNode) {
         int id = identity.id();
         int count = identity.count();
         return switch (properties.mode()) {
@@ -62,7 +67,10 @@ public class PhilosopherConfiguration {
                     "unsafe", id, count, properties.pollMs());
             case SUPERVISED_LOCKED -> new PairSupervisedStrategy(supervisorClient(properties, clock, id),
                     "locked", id, count, properties.pollMs());
-            default -> throw new IllegalStateException("Mode pas encore disponible : " + properties.mode());
+            case TOKEN -> new TokenStrategy(tokenNode.getObject(), ForkAssignment.forksFor(id, count),
+                    properties.retransmitMs());
+            case ZOOKEEPER -> ZooKeeperStrategy.connect(properties.zookeeperConnect(),
+                    ForkAssignment.forksFor(id, count));
         };
     }
 
