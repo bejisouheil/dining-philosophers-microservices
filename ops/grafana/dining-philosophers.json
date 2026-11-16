@@ -1,0 +1,41 @@
+{
+  "title": "Dîner des philosophes",
+  "uid": "dining-philosophers",
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Repas par seconde, par philosophe",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "rate(philosopher_meals_total[1m])", "legendFormat": "{{instance}}" } ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Attente moyenne des fourchettes (secondes)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "rate(philosopher_wait_seconds_sum[1m]) / rate(philosopher_wait_seconds_count[1m])", "legendFormat": "{{instance}}" } ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Services en marche",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "sum(up)" } ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Attente maximale des fourchettes (secondes)",
+      "gridPos": { "x": 6, "y": 8, "w": 18, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "philosopher_wait_seconds_max", "legendFormat": "{{instance}}" } ]
+    }
+  ]
+}

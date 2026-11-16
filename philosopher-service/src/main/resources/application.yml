@@ -23,3 +23,7 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # Kafka est facultatif : son absence ne doit pas rendre le philosophe « en panne ».
+    kafka:
+      enabled: false

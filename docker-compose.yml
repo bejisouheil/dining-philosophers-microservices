@@ -1,0 +1,144 @@
+# Lance tout le système : docker compose up --build
+#
+# Variables utiles (fichier .env ou ligne de commande) :
+#   MODE=token              variante : spoiled, supervised-naive, supervised-unsafe,
+#                           supervised-locked, token, zookeeper
+#   EVENTS=kafka            transport des événements : kafka ou http
+#   RACE_WINDOW_MS=0        élargit la fenêtre de course du superviseur (démonstration des failles)
+#
+# Tableau de bord : http://localhost:8090      Prometheus : http://localhost:9090
+# Grafana : http://localhost:3000 (profil « observability »)
+
+x-service: &service
+  build:
+    context: .
+  restart: unless-stopped
+  environment: &common-env
+    # Journaux au format JSON structuré (Elastic Common Schema), prêts pour un agrégateur.
+    LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+
+x-philosopher: &philosopher
+  <<: *service
+  build:
+    context: .
+    args:
+      SERVICE: philosopher-service
+  image: dining/philosopher-service
+  depends_on: [monitor, supervisor, zookeeper, kafka]
+  environment: &philosopher-env
+    <<: *common-env
+    PHILOSOPHER_MODE: ${MODE:-token}
+    PHILOSOPHER_COUNT: 5
+    # L'identifiant du philosophe est lu à la fin du nom d'hôte (philosopher-3 → 3).
+    PHILOSOPHER_PEER_URL_TEMPLATE: http://philosopher-{id}:8081
+    PHILOSOPHER_MONITOR_URL: http://monitor:8090
+    PHILOSOPHER_SUPERVISOR_URL: http://supervisor:8080
+    PHILOSOPHER_ZOOKEEPER_CONNECT: zookeeper:2181
+    PHILOSOPHER_EVENTS_TRANSPORT: ${EVENTS:-kafka}
+    PHILOSOPHER_STATE_DIR: /data
+    SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+services:
+  zookeeper:
+    image: zookeeper:3.9
+    restart: unless-stopped
+
+  kafka:
+    image: apache/kafka:3.9.1
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  monitor:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: monitor-service
+    image: dining/monitor-service
+    depends_on: [kafka]
+    ports: ["8090:8090"]
+    environment:
+      <<: *common-env
+      MONITOR_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+  supervisor:
+    <<: *service
+    build:
+      context: .
+      args:
+        SERVICE: supervisor-service
+    image: dining/supervisor-service
+    ports: ["8080:8080"]
+    environment:
+      <<: *common-env
+      SUPERVISOR_FORKS: 5
+      SUPERVISOR_RACE_WINDOW_MS: ${RACE_WINDOW_MS:-0}
+
+  philosopher-0:
+    <<: *philosopher
+    hostname: philosopher-0
+    ports: ["8081:8081"]
+    volumes: ["philosopher-0:/data"]
+
+  philosopher-1:
+    <<: *philosopher
+    hostname: philosopher-1
+    ports: ["8082:8081"]
+    volumes: ["philosopher-1:/data"]
+
+  philosopher-2:
+    <<: *philosopher
+    hostname: philosopher-2
+    ports: ["8083:8081"]
+    volumes: ["philosopher-2:/data"]
+
+  philosopher-3:
+    <<: *philosopher
+    hostname: philosopher-3
+    ports: ["8084:8081"]
+    volumes: ["philosopher-3:/data"]
+
+  philosopher-4:
+    <<: *philosopher
+    hostname: philosopher-4
+    ports: ["8085:8081"]
+    volumes: ["philosopher-4:/data"]
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    ports: ["9090:9090"]
+    volumes:
+      - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    profiles: [observability]
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./ops/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./ops/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./ops/grafana/dining-philosophers.json:/var/lib/grafana/dashboards/dining-philosophers.json:ro
+
+volumes:
+  philosopher-0:
+  philosopher-1:
+  philosopher-2:
+  philosopher-3:
+  philosopher-4:

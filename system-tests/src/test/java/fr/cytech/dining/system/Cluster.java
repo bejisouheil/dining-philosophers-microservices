@@ -31,6 +31,7 @@ final class Cluster implements AutoCloseable {
     private final int supervisorPort;
     private final int basePort;
     private final Map<String, String> philosopherOptions;
+    private final List<String> commonArguments;
     private final RestClient http = RestClient.create();
 
     private ConfigurableApplicationContext monitor;
@@ -57,9 +58,11 @@ final class Cluster implements AutoCloseable {
         philosopherOptions.put("poll-ms", "5");
         philosopherOptions.put("retransmit-ms", "200");
         philosopherOptions.putAll(builder.philosopherOptions);
+        this.commonArguments = List.copyOf(builder.commonArguments);
 
-        monitor = run(MonitorServiceApplication.class, "monitor-service", monitorPort, List.of());
-        List<String> supervisorArguments = new ArrayList<>(List.of("--supervisor.forks=" + count));
+        startMonitor();
+        List<String> supervisorArguments = new ArrayList<>(commonArguments);
+        supervisorArguments.add("--supervisor.forks=" + count);
         builder.supervisorOptions.forEach((key, value) -> supervisorArguments.add("--supervisor." + key + "=" + value));
         supervisor = run(SupervisorServiceApplication.class, "supervisor-service", supervisorPort,
                 supervisorArguments);
@@ -77,6 +80,7 @@ final class Cluster implements AutoCloseable {
         private final String mode;
         private final Map<String, String> philosopherOptions = new LinkedHashMap<>();
         private final Map<String, String> supervisorOptions = new LinkedHashMap<>();
+        private final List<String> commonArguments = new ArrayList<>();
 
         private Builder(int count, String mode) {
             this.count = count;
@@ -95,6 +99,12 @@ final class Cluster implements AutoCloseable {
             return this;
         }
 
+        /** Ajoute un argument de ligne de commande à tous les services (ex. adresse de Kafka). */
+        Builder argument(String argument) {
+            commonArguments.add(argument);
+            return this;
+        }
+
         Cluster start() {
             return new Cluster(this);
         }
@@ -102,8 +112,12 @@ final class Cluster implements AutoCloseable {
 
     // --- Cycle de vie des services (pannes et redémarrages compris) ---
 
+    void startMonitor() {
+        monitor = run(MonitorServiceApplication.class, "monitor-service", monitorPort, commonArguments);
+    }
+
     void startPhilosopher(int id) {
-        List<String> arguments = new ArrayList<>();
+        List<String> arguments = new ArrayList<>(commonArguments);
         arguments.add("--philosopher.id=" + id);
         philosopherOptions.forEach((key, value) -> arguments.add("--philosopher." + key + "=" + value));
         philosophers[id] = run(PhilosopherServiceApplication.class, "philosopher-" + id, basePort + id, arguments);

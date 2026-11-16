@@ -9,6 +9,7 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import fr.cytech.dining.common.HttpSupport;
 import fr.cytech.dining.common.LamportClock;
@@ -18,6 +19,7 @@ import fr.cytech.dining.philosopher.core.PhilosopherLoop;
 import fr.cytech.dining.philosopher.core.SpoiledStrategy;
 import fr.cytech.dining.philosopher.events.EventPublisher;
 import fr.cytech.dining.philosopher.events.HttpEventPublisher;
+import fr.cytech.dining.philosopher.events.KafkaEventPublisher;
 import fr.cytech.dining.philosopher.graph.GraphWorker;
 import fr.cytech.dining.philosopher.supervised.NaiveSupervisedStrategy;
 import fr.cytech.dining.philosopher.supervised.PairSupervisedStrategy;
@@ -50,11 +52,13 @@ public class PhilosopherConfiguration {
     }
 
     @Bean
-    EventPublisher eventPublisher(PhilosopherProperties properties) {
+    EventPublisher eventPublisher(PhilosopherProperties properties,
+                                  ObjectProvider<KafkaTemplate<String, String>> kafka) {
         return switch (properties.eventsTransport().toLowerCase()) {
             case "none" -> EventPublisher.NONE;
             case "http" -> new HttpEventPublisher(HttpSupport.restClient(
                     properties.monitorUrl(), Duration.ofMillis(properties.requestTimeoutMs())));
+            case "kafka" -> new KafkaEventPublisher(kafka.getObject(), properties.eventsTopic());
             default -> throw new IllegalArgumentException(
                     "philosopher.events-transport inconnu : " + properties.eventsTransport());
         };
