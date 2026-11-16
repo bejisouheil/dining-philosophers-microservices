@@ -223,7 +223,9 @@ final class Cluster implements AutoCloseable {
     /** Les philosophes écoutent sur basePort + id : il faut N ports libres qui se suivent. */
     private static int consecutiveFreePorts(int count) {
         for (int attempt = 0; attempt < 200; attempt++) {
-            int base = ThreadLocalRandom.current().nextInt(20_000, 45_000);
+            // Sous les ports attribués automatiquement par le système (moniteur, superviseur) :
+            // les deux plages ne peuvent donc pas se chevaucher.
+            int base = ThreadLocalRandom.current().nextInt(20_000, 30_000);
             List<ServerSocket> sockets = new ArrayList<>();
             try {
                 for (int i = 0; i < count; i++) {
