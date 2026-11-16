@@ -189,6 +189,7 @@ Les philosophes forment un StatefulSet : chaque pod a un nom stable (`philosophe
 - [Journal des décisions](docs/decisions.md) : chaque choix technique, ses alternatives et sa justification.
 - [Répartition du travail](docs/repartition-travail.md) : qui est responsable de quoi.
 - [Guide de démonstration](docs/guide-demonstration.md) : le déroulé pas à pas pour la soutenance.
+- [Diapositives de soutenance](https://claude.ai/artifact/WaAsSNdrLDMqNcLzsB76W4) : 20 diapositives avec notes d'orateur (lien privé, à partager depuis son menu Partager).
 
 ## Avancement
 
