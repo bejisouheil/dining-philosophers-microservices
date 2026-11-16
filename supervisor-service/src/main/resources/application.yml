@@ -4,9 +4,20 @@ spring:
 
 server:
   port: ${PORT:8080}
+  shutdown: graceful
+
+# SUPERVISOR_FORKS : nombre de fourchettes. SUPERVISOR_RACE_WINDOW_MS : élargit la fenêtre de
+# course pour rendre visibles les failles des variantes /naive et /unsafe en démonstration.
+supervisor:
+  forks: 5
+  race-window-ms: 0
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true

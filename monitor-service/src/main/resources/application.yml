@@ -1,12 +1,32 @@
 spring:
   application:
     name: monitor-service
+  kafka:
+    consumer:
+      # Le moniteur relit tout le topic à chaque démarrage pour reconstruire son historique.
+      auto-offset-reset: earliest
 
 server:
   port: ${PORT:8090}
+  shutdown: graceful
+
+# MONITOR_KAFKA_ENABLED=true : lire aussi les événements depuis Kafka (section 6).
+# L'adresse de Kafka se règle par SPRING_KAFKA_BOOTSTRAP_SERVERS.
+monitor:
+  kafka:
+    enabled: false
+    topic: philosopher-events
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    # Kafka est facultatif : son absence ne doit pas rendre le moniteur « en panne ».
+    kafka:
+      enabled: false

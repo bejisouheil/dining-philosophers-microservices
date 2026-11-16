@@ -1,0 +1,24 @@
+# Prometheus interroge toutes les 5 secondes les métriques exposées par Spring Boot Actuator.
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: philosophers
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - philosopher-0:8081
+          - philosopher-1:8081
+          - philosopher-2:8081
+          - philosopher-3:8081
+          - philosopher-4:8081
+
+  - job_name: monitor
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [monitor:8090]
+
+  - job_name: supervisor
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [supervisor:8080]

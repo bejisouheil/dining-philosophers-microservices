@@ -26,3 +26,9 @@ sujet*.pdf
 # Système
 .DS_Store
 Thumbs.db
+
+# Services lances en local par scripts/start-local.ps1
+.run/
+
+# Graphe de connaissances genere localement
+graphify-out/

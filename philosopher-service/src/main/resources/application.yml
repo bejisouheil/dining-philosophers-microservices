@@ -3,11 +3,27 @@ spring:
     name: philosopher-service
 
 server:
-  # Lancer plusieurs philosophes : donner un PORT différent à chaque instance.
+  # Lancer plusieurs philosophes en local : donner un PORT différent à chaque instance.
+  # Le philosophe i écoute sur 8081 + i ; son identifiant est déduit du port.
   port: ${PORT:8081}
+  shutdown: graceful
+
+# Toutes les options sont décrites dans PhilosopherProperties. Chacune se règle aussi par
+# variable d'environnement : PHILOSOPHER_MODE, PHILOSOPHER_COUNT, PHILOSOPHER_MONITOR_URL...
+philosopher:
+  mode: spoiled
+  count: 5
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    # Kafka est facultatif : son absence ne doit pas rendre le philosophe « en panne ».
+    kafka:
+      enabled: false

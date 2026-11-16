@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+.vscode
+**/target
+docs
+k8s
+graphify-out
+*.md
+*.pdf
