@@ -94,8 +94,8 @@ Vérifier qu'un service répond : <http://localhost:8090/actuator/health>.
 | Membre | GitHub |
 | --- | --- |
 | Souheil BEJI | [@bejisouheil](https://github.com/bejisouheil) |
-| *À compléter* | |
-| *À compléter* | |
+| Mohamed OUHAB | [@Quirlo](https://github.com/Quirlo) |
+| Taimim JELOUALI | [@Taimim](https://github.com/Taimim) |
 
 ## Contribuer
 

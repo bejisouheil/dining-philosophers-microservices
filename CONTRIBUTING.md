@@ -1,14 +1,14 @@
 # Contribuer au projet
 
-Ces règles gardent `main` stable et rendent le travail à trois lisible.
+Ces règles gardent `master` stable et rendent le travail à trois lisible.
 
 ## Le cycle de travail
 
 1. Prendre une issue, ou en créer une, et se l'assigner.
-2. Partir d'un `main` à jour :
+2. Partir d'un `master` à jour :
 
    ```bash
-   git switch main
+   git switch master
    git pull
    git switch -c feature/etape1-monitor
    ```
@@ -20,10 +20,10 @@ Ces règles gardent `main` stable et rendent le travail à trois lisible.
    git push -u origin feature/etape1-monitor
    ```
 
-4. Ouvrir une pull request vers `main` et demander une relecture à un camarade.
+4. Ouvrir une pull request vers `master` et demander une relecture à un camarade.
 5. Une fois la CI verte et la relecture faite, fusionner en **Squash and merge** puis supprimer la branche.
 
-On ne pousse jamais directement sur `main`.
+On ne pousse jamais directement sur `master`.
 
 ## Nommer les branches
 
@@ -46,11 +46,11 @@ test(philosopher): vérifier le transfert de jeton
 docs(rapport): décrire le protocole par jetons
 ```
 
-## Rester à jour avec `main`
+## Rester à jour avec `master`
 
 ```bash
 git fetch origin
-git rebase origin/main
+git rebase origin/master
 git push --force-with-lease
 ```
 
