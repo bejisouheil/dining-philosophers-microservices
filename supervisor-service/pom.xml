@@ -14,6 +14,13 @@
     <name>Supervisor Service</name>
     <description>Attribue et libère les fourchettes (étapes 2 et 3)</description>
 
+    <dependencies>
+        <dependency>
+            <groupId>fr.cytech.dining</groupId>
+            <artifactId>common</artifactId>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <plugin>

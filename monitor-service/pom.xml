@@ -14,6 +14,13 @@
     <name>Monitor Service</name>
     <description>Collecte les événements des philosophes et expose le tableau de bord</description>
 
+    <dependencies>
+        <dependency>
+            <groupId>fr.cytech.dining</groupId>
+            <artifactId>common</artifactId>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <plugin>

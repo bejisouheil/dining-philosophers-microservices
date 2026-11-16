@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dîner des philosophes - Moniteur</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1c2330; --muted: #6a7384; --line: #e2e5ea;
+    --thinking: #8fa3bf; --hungry: #e8a33a; --eating: #3aa76d; --danger: #d64545; --fork: #b9c0cc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #12151b; --card: #1b2029; --text: #e7eaf0; --muted: #98a2b3; --line: #2b323e; --fork: #4a5364; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; justify-content: space-between; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 14px; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  main { display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 16px; padding: 0 24px 24px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 0 16px 16px; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .wide { grid-column: 1 / -1; }
+  .stats { display: flex; gap: 20px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
+  .stats b { color: var(--text); font-size: 18px; display: block; }
+  .alert { grid-column: 1 / -1; border-radius: 10px; padding: 12px 16px; font-weight: 600; display: none; }
+  .alert.on { display: block; }
+  .alert.danger { background: var(--danger); color: #fff; }
+  .alert.warn { background: var(--hungry); color: #1c2330; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; }
+  .scroll { overflow-x: auto; max-height: 360px; overflow-y: auto; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 600; }
+  .THINKING { background: var(--thinking); } .HUNGRY { background: var(--hungry); } .EATING { background: var(--eating); }
+  .DONE { background: var(--thinking); }
+  svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 14px; justify-content: center; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+  button { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  #offline { color: var(--danger); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dîner des philosophes <span style="color:var(--muted);font-weight:400">· moniteur</span></h1>
+  <div><span id="offline"></span> <button id="reset" title="Efface l'historique du moniteur">Remettre à zéro</button></div>
+</header>
+<main>
+  <div id="violation" class="alert danger"></div>
+  <div id="deadlock" class="alert danger">Interblocage suspecté : tous les philosophes ont faim et personne ne mange.</div>
+  <div id="starving" class="alert warn"></div>
+
+  <section class="card">
+    <h2>La table</h2>
+    <svg id="table" viewBox="0 0 400 400" role="img" aria-label="Table des philosophes"></svg>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--thinking)"></span>pense</span>
+      <span><span class="dot" style="background:var(--hungry)"></span>a faim</span>
+      <span><span class="dot" style="background:var(--eating)"></span>mange</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Philosophes</h2>
+    <div class="stats" style="margin-bottom:12px">
+      <span><b id="s-meals">0</b>repas</span>
+      <span><b id="s-events">0</b>événements</span>
+      <span><b id="s-violations">0</b>violations</span>
+      <span><b id="s-mode">-</b>mode</span>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>#</th><th>État</th><th>Horloge</th><th>Repas</th><th>Attente max</th><th>Fourchettes</th></tr></thead>
+        <tbody id="philosophers"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card wide">
+    <h2>Historique reconstruit (ordre des horloges de Lamport, le plus récent en haut)</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Horloge</th><th>Philosophe</th><th>Événement</th><th>Fourchettes</th><th>Heure réelle</th></tr></thead>
+        <tbody id="events"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const color = { THINKING: 'var(--thinking)', HUNGRY: 'var(--hungry)', EATING: 'var(--eating)' };
+const label = { THINKING: 'pense', HUNGRY: 'a faim', EATING: 'mange', DONE: 'a fini' };
+
+function drawTable(philosophers) {
+  const n = philosophers.length;
+  let svg = '<circle cx="200" cy="200" r="110" fill="none" stroke="var(--line)" stroke-width="3"/>';
+  philosophers.forEach((p, i) => {
+    const angle = 2 * Math.PI * i / Math.max(n, 1) - Math.PI / 2;
+    const x = 200 + 150 * Math.cos(angle), y = 200 + 150 * Math.sin(angle);
+    svg += `<circle cx="${x}" cy="${y}" r="26" fill="${color[p.state] || 'var(--thinking)'}"/>`;
+    svg += `<text x="${x}" y="${y + 5}" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">P${esc(p.id)}</text>`;
+    if (p.forks.length > 0 && n > 1) {
+      const a2 = angle + Math.PI / n;
+      const used = philosophers.some(q => q.state === 'EATING' && q.forks.includes((p.id + 1) % n));
+      const fx = 200 + 95 * Math.cos(a2), fy = 200 + 95 * Math.sin(a2);
+      const gx = 200 + 70 * Math.cos(a2), gy = 200 + 70 * Math.sin(a2);
+      svg += `<line x1="${fx}" y1="${fy}" x2="${gx}" y2="${gy}" stroke="${used ? 'var(--eating)' : 'var(--fork)'}" stroke-width="5" stroke-linecap="round"/>`;
+    }
+  });
+  if (n === 0) {
+    svg += '<text x="200" y="205" text-anchor="middle" font-size="14" fill="var(--muted)">En attente des philosophes...</text>';
+  }
+  $('table').innerHTML = svg;
+}
+
+function render(s) {
+  drawTable(s.philosophers);
+  $('s-meals').textContent = s.totalMeals;
+  $('s-events').textContent = s.totalEvents;
+  $('s-violations').textContent = s.violationCount;
+  $('s-mode').textContent = s.philosophers.length ? s.philosophers[0].mode : '-';
+  $('philosophers').innerHTML = s.philosophers.map(p => `<tr>
+      <td>P${esc(p.id)}</td>
+      <td><span class="pill ${esc(p.state)}">${label[p.state] || esc(p.state)}</span></td>
+      <td>${esc(p.lamportTime)}</td><td>${esc(p.meals)}</td><td>${esc(p.maxWaitMs)} ms</td>
+      <td>${p.forks.map(esc).join(', ') || '-'}</td></tr>`).join('');
+  $('events').innerHTML = s.recentEvents.map(e => `<tr>
+      <td>${esc(e.lamportTime)}</td><td>P${esc(e.philosopherId)}</td>
+      <td><span class="pill ${esc(e.type)}">${esc(e.type)}</span></td>
+      <td>${e.forks.map(esc).join(', ') || '-'}</td>
+      <td>${new Date(e.wallClockMillis).toLocaleTimeString()}</td></tr>`).join('');
+  const last = s.violations[s.violations.length - 1];
+  $('violation').classList.toggle('on', s.violationCount > 0);
+  if (last) {
+    $('violation').textContent = `Exclusion mutuelle violée ${s.violationCount} fois. Dernière : la fourchette ${last.fork} utilisée en même temps par P${last.holder} et P${last.intruder} (horloge ${last.lamportTime}).`;
+  }
+  $('deadlock').classList.toggle('on', s.suspectedDeadlock);
+  $('starving').classList.toggle('on', s.starving.length > 0 && !s.suspectedDeadlock);
+  $('starving').textContent = `Famine possible : ${s.starving.map(id => 'P' + id).join(', ')} attend(ent) depuis longtemps.`;
+}
+
+async function refresh() {
+  try {
+    const response = await fetch('/api/snapshot');
+    render(await response.json());
+    $('offline').textContent = '';
+  } catch (e) {
+    $('offline').textContent = 'Moniteur injoignable';
+  }
+}
+$('reset').addEventListener('click', async () => { await fetch('/api/events', { method: 'DELETE' }); refresh(); });
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
