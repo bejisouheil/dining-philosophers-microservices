@@ -18,6 +18,7 @@ import fr.cytech.dining.philosopher.core.PhilosopherLoop;
 import fr.cytech.dining.philosopher.core.SpoiledStrategy;
 import fr.cytech.dining.philosopher.events.EventPublisher;
 import fr.cytech.dining.philosopher.events.HttpEventPublisher;
+import fr.cytech.dining.philosopher.graph.GraphWorker;
 import fr.cytech.dining.philosopher.supervised.NaiveSupervisedStrategy;
 import fr.cytech.dining.philosopher.supervised.PairSupervisedStrategy;
 import fr.cytech.dining.philosopher.supervised.SupervisorClient;
@@ -36,6 +37,11 @@ public class PhilosopherConfiguration {
         String hostname = environment.getProperty("HOSTNAME");
         int port = environment.getProperty("server.port", Integer.class, properties.basePort());
         return PhilosopherIdentity.resolve(properties, hostname, port);
+    }
+
+    @Bean
+    GraphWorker graphWorker() {
+        return new GraphWorker();
     }
 
     @Bean

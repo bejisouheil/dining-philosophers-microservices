@@ -144,15 +144,15 @@ final class Cluster implements AutoCloseable {
     }
 
     PhilosopherLoop.Status state(int id) {
-        return http.get().uri(philosopherUrl(id) + "/state").retrieve().body(PhilosopherLoop.Status.class);
+        return http.get().uri(url(id) + "/state").retrieve().body(PhilosopherLoop.Status.class);
     }
 
     TokenNode.Snapshot tokenState(int id) {
-        return http.get().uri(philosopherUrl(id) + "/token/state").retrieve().body(TokenNode.Snapshot.class);
+        return http.get().uri(url(id) + "/token/state").retrieve().body(TokenNode.Snapshot.class);
     }
 
     void control(int id, String action) {
-        http.post().uri(philosopherUrl(id) + "/control/" + action).retrieve().toBodilessEntity();
+        http.post().uri(url(id) + "/control/" + action).retrieve().toBodilessEntity();
     }
 
     String supervisorForks() {
@@ -177,7 +177,7 @@ final class Cluster implements AutoCloseable {
         return min;
     }
 
-    private String philosopherUrl(int id) {
+    String url(int id) {
         return "http://localhost:" + (basePort + id);
     }
 
