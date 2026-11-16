@@ -25,6 +25,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param requestTimeoutMs délai maximal d'un appel HTTP
  * @param retransmitMs     période de retransmission d'une demande restée sans effet (section 3.3)
  * @param pollMs           période d'interrogation du superviseur quand une fourchette est prise
+ * @param stateDir         dossier de sauvegarde de l'état du protocole par jetons (vide = aucune)
  */
 @ConfigurationProperties("philosopher")
 public record PhilosopherProperties(
@@ -45,7 +46,12 @@ public record PhilosopherProperties(
         @DefaultValue("localhost:2181") String zookeeperConnect,
         @DefaultValue("2000") long requestTimeoutMs,
         @DefaultValue("1000") long retransmitMs,
-        @DefaultValue("50") long pollMs) {
+        @DefaultValue("50") long pollMs,
+        String stateDir) {
+
+    public PhilosopherProperties {
+        stateDir = stateDir == null ? "" : stateDir;
+    }
 
     /** Adresse du philosophe {@code peerId} d'après le gabarit configuré. */
     public String peerUrl(int peerId) {

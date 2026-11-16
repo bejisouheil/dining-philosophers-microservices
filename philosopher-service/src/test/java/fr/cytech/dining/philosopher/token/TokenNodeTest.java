@@ -129,7 +129,7 @@ class TokenNodeTest {
             node.onRequest(requestFrom(0, 1, 5, 0, 1));
 
             ArgumentCaptor<Messages.Token> sent = ArgumentCaptor.forClass(Messages.Token.class);
-            verify(transport).sendToken(eq(0), sent.capture());
+            verify(transport).sendToken(eq(0), sent.capture(), any());
             assertThat(sent.getValue().fork()).isEqualTo(1);
             assertThat(sent.getValue().version()).isEqualTo(1);
             assertThat(node.snapshot().heldTokens()).isEmpty();
@@ -139,7 +139,7 @@ class TokenNodeTest {
         void unJetonDontPersonneNeVeutResteOuIlEst() {
             node.onRequest(requestFrom(3, 1, 5, 3, 4)); // ne concerne pas la fourchette 1
 
-            verify(transport, never()).sendToken(anyInt(), any());
+            verify(transport, never()).sendToken(anyInt(), any(), any());
             assertThat(node.snapshot().heldTokens()).containsOnlyKeys(1);
         }
 
@@ -148,7 +148,7 @@ class TokenNodeTest {
             node.request(MY_FORKS); // date 1
             node.onRequest(requestFrom(0, 1, 50, 0, 1)); // date 50 : moins prioritaire
 
-            verify(transport, never()).sendToken(anyInt(), any());
+            verify(transport, never()).sendToken(anyInt(), any(), any());
             assertThat(node.snapshot().heldTokens()).containsOnlyKeys(1);
         }
 
@@ -158,7 +158,7 @@ class TokenNodeTest {
             node.request(MY_FORKS);                      // ma demande est donc datée après 20
             node.onRequest(requestFrom(0, 1, 2, 0, 1));  // demande plus ancienne arrivée en retard
 
-            verify(transport).sendToken(eq(0), any()); // « tenir et attendre » est interdit
+            verify(transport).sendToken(eq(0), any(), any()); // « tenir et attendre » est interdit
             assertThat(node.snapshot().state()).isEqualTo(State.WAITING);
         }
 
@@ -167,7 +167,7 @@ class TokenNodeTest {
             node.request(MY_FORKS); // date 1, identifiant 1
             node.onRequest(requestFrom(0, 1, 1, 0, 1)); // date 1, identifiant 0 : prioritaire
 
-            verify(transport).sendToken(eq(0), any());
+            verify(transport).sendToken(eq(0), any(), any());
         }
 
         @Test
@@ -179,12 +179,12 @@ class TokenNodeTest {
 
             holder.onRequest(requestFrom(3, 1, 30, 3, 4));
             ArgumentCaptor<Messages.Token> first = ArgumentCaptor.forClass(Messages.Token.class);
-            verify(transport).sendToken(eq(3), first.capture());
+            verify(transport).sendToken(eq(3), first.capture(), any());
             assertThat(first.getValue().fork()).isEqualTo(3);
 
             holder.onRequest(requestFrom(1, 1, 10, 1, 2));
             ArgumentCaptor<Messages.Token> second = ArgumentCaptor.forClass(Messages.Token.class);
-            verify(transport).sendToken(eq(1), second.capture());
+            verify(transport).sendToken(eq(1), second.capture(), any());
             assertThat(second.getValue().fork()).isEqualTo(2);
         }
 
@@ -196,7 +196,7 @@ class TokenNodeTest {
             node.onToken(token(4, 7, 0)); // je n'ai rien demandé, mais le philosophe 3 attend la fourchette 4
 
             ArgumentCaptor<Messages.Token> sent = ArgumentCaptor.forClass(Messages.Token.class);
-            verify(transport).sendToken(eq(3), sent.capture());
+            verify(transport).sendToken(eq(3), sent.capture(), any());
             assertThat(sent.getValue().fork()).isEqualTo(4);
             assertThat(sent.getValue().version()).isEqualTo(8); // la version augmente à chaque transfert
         }
@@ -234,7 +234,7 @@ class TokenNodeTest {
             node.onRequest(requestFrom(0, 1, 1, 0, 1)); // demande pourtant très prioritaire
             node.onRequest(requestFrom(2, 1, 1, 2, 3));
 
-            verify(transport, never()).sendToken(anyInt(), any());
+            verify(transport, never()).sendToken(anyInt(), any(), any());
         }
 
         @Test
@@ -250,8 +250,8 @@ class TokenNodeTest {
             verify(transport, times(4)).sendRelease(anyInt(), any());
             ArgumentCaptor<Messages.Token> toZero = ArgumentCaptor.forClass(Messages.Token.class);
             ArgumentCaptor<Messages.Token> toTwo = ArgumentCaptor.forClass(Messages.Token.class);
-            verify(transport).sendToken(eq(0), toZero.capture());
-            verify(transport).sendToken(eq(2), toTwo.capture());
+            verify(transport).sendToken(eq(0), toZero.capture(), any());
+            verify(transport).sendToken(eq(2), toTwo.capture(), any());
             assertThat(toZero.getValue().fork()).isEqualTo(1);
             assertThat(toTwo.getValue().fork()).isEqualTo(2);
             assertThat(node.snapshot().state()).isEqualTo(State.IDLE);
@@ -280,7 +280,7 @@ class TokenNodeTest {
 
             assertThat(granted).isCancelled();
             verify(transport, times(4)).sendRelease(anyInt(), any());
-            verify(transport).sendToken(eq(0), any());
+            verify(transport).sendToken(eq(0), any(), any());
         }
     }
 
@@ -297,7 +297,7 @@ class TokenNodeTest {
             node.onToken(token(2, 1, 2)); // retransmission tardive de l'ancien jeton
 
             assertThat(node.snapshot().heldTokens()).doesNotContainKey(2); // pas de jeton fantôme
-            verify(transport, never()).sendToken(anyInt(), any());
+            verify(transport, never()).sendToken(anyInt(), any(), any());
         }
 
         @Test
@@ -315,7 +315,7 @@ class TokenNodeTest {
             node.onRequest(requestFrom(0, 1, 5, 0, 1)); // retransmission d'une demande déjà finie
 
             assertThat(node.snapshot().pendingRequests()).isEmpty();
-            verify(transport, never()).sendToken(anyInt(), any());
+            verify(transport, never()).sendToken(anyInt(), any(), any());
         }
 
         @Test

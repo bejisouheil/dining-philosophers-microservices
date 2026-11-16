@@ -44,20 +44,20 @@ public class HttpPeerTransport implements PeerTransport, AutoCloseable {
 
     @Override
     public void sendRequest(int to, Messages.Request message) {
-        enqueue(to, "/token/request", message, REQUEST_ATTEMPTS);
+        enqueue(to, "/token/request", message, REQUEST_ATTEMPTS, null);
     }
 
     @Override
     public void sendRelease(int to, Messages.Release message) {
-        enqueue(to, "/token/release", message, RELEASE_ATTEMPTS);
+        enqueue(to, "/token/release", message, RELEASE_ATTEMPTS, null);
     }
 
     @Override
-    public void sendToken(int to, Messages.Token message) {
-        enqueue(to, "/token/transfer", message, UNLIMITED);
+    public void sendToken(int to, Messages.Token message, Runnable acknowledged) {
+        enqueue(to, "/token/transfer", message, UNLIMITED, acknowledged);
     }
 
-    private void enqueue(int to, String path, Object body, int maxAttempts) {
+    private void enqueue(int to, String path, Object body, int maxAttempts, Runnable onDelivered) {
         if (closed) {
             return;
         }
@@ -65,21 +65,25 @@ public class HttpPeerTransport implements PeerTransport, AutoCloseable {
             Thread thread = new Thread(runnable, "peer-" + peer);
             thread.setDaemon(true);
             return thread;
-        })).execute(() -> deliver(to, path, body, maxAttempts));
+        })).execute(() -> {
+            if (deliver(to, path, body, maxAttempts) && onDelivered != null) {
+                onDelivered.run();
+            }
+        });
     }
 
-    private void deliver(int to, String path, Object body, int maxAttempts) {
+    private boolean deliver(int to, String path, Object body, int maxAttempts) {
         RestClient client = clients.computeIfAbsent(to, peer -> HttpSupport.restClient(urlOf.apply(peer), timeout));
         long backoffMs = 50;
         for (int attempt = 1; attempt <= maxAttempts && !closed; attempt++) {
             try {
                 client.post().uri(path).contentType(MediaType.APPLICATION_JSON).body(body).retrieve()
                         .toBodilessEntity();
-                return;
+                return true;
             } catch (RestClientException e) {
                 if (attempt == maxAttempts) {
                     log.warn("Message {} vers le philosophe {} abandonné après {} essais", path, to, attempt);
-                    return;
+                    return false;
                 }
                 if (attempt == 1 || attempt % 20 == 0) {
                     log.warn("Philosophe {} injoignable pour {} (essai {}) : {}", to, path, attempt, e.getMessage());
@@ -88,11 +92,12 @@ public class HttpPeerTransport implements PeerTransport, AutoCloseable {
                     Thread.sleep(backoffMs);
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
-                    return;
+                    return false;
                 }
                 backoffMs = Math.min(backoffMs * 2, 1000);
             }
         }
+        return false;
     }
 
     @Override

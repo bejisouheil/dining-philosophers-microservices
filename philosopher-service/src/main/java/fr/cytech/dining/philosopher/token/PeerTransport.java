@@ -12,6 +12,9 @@ public interface PeerTransport {
     /** Libération : retentée plusieurs fois ; une perte est rattrapée par {@code senderCompleted}. */
     void sendRelease(int to, Messages.Release message);
 
-    /** Jeton : ne doit jamais se perdre, l'envoi est retenté jusqu'à l'accusé de réception. */
-    void sendToken(int to, Messages.Token message);
+    /**
+     * Jeton : ne doit jamais se perdre. L'envoi est retenté jusqu'à l'accusé de réception du
+     * destinataire, puis {@code acknowledged} est appelé.
+     */
+    void sendToken(int to, Messages.Token message, Runnable acknowledged);
 }

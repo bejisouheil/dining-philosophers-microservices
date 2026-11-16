@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
@@ -11,6 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 import fr.cytech.dining.common.LamportClock;
+import fr.cytech.dining.philosopher.token.TokenStateStore.Outgoing;
 
 /**
  * Cœur du protocole distribué par jetons (section 3.3). Aucun superviseur : chaque philosophe
@@ -34,7 +36,7 @@ import fr.cytech.dining.common.LamportClock;
  * <h2>Propriétés</h2>
  * <ul>
  *   <li><strong>Exclusion mutuelle</strong> : unicité du jeton (retiré avant envoi, numéro de
- *       version contre les doublons).</li>
+ *       version contre les doublons, état sauvegardé contre les pannes).</li>
  *   <li><strong>Pas d'interblocage</strong> : on ne garde jamais un jeton face à une demande plus
  *       prioritaire, et la priorité est un ordre total identique partout : pas de cycle d'attente
  *       possible.</li>
@@ -53,20 +55,23 @@ public class TokenNode {
 
     /** Vue de l'état interne, pour l'API de diagnostic et les tests. */
     public record Snapshot(int id, State state, long clock, Map<Integer, Long> heldTokens,
-                           List<ForkRequest> pendingRequests, ForkRequest currentRequest,
-                           long messagesSent, long tokensSent) {
+                           Map<Integer, Integer> tokensInFlight, List<ForkRequest> pendingRequests,
+                           ForkRequest currentRequest, long messagesSent, long tokensSent) {
     }
 
     private final int id;
     private final int count;
     private final LamportClock clock;
     private final PeerTransport transport;
+    private final TokenStateStore store;
     private final ReentrantLock lock = new ReentrantLock();
 
     /** Jetons détenus : fourchette → version du jeton. */
     private final Map<Integer, Long> held = new HashMap<>();
     /** Plus haute version vue pour chaque fourchette : détecte les jetons reçus en double. */
     private final Map<Integer, Long> lastVersion = new HashMap<>();
+    /** Jetons envoyés mais pas encore acquittés : à renvoyer après une panne. */
+    private final Map<Integer, Outgoing> inFlight = new HashMap<>();
     /** Demandes connues et non terminées (la mienne comprise), triées par priorité. */
     private final TreeSet<ForkRequest> pending = new TreeSet<>();
     /** Pour chaque philosophe, numéro de sa dernière demande terminée : filtre les demandes périmées. */
@@ -76,11 +81,21 @@ public class TokenNode {
     private ForkRequest current;
     private State state = State.IDLE;
     private CompletableFuture<Void> granted;
+    private boolean dirty;
 
     private final AtomicLong messagesSent = new AtomicLong();
     private final AtomicLong tokensSent = new AtomicLong();
 
+    /** Philosophe sans mémoire stable (son état disparaît s'il s'arrête). */
     public TokenNode(int id, int count, LamportClock clock, PeerTransport transport) {
+        this(id, count, clock, transport, TokenStateStore.NONE);
+    }
+
+    /**
+     * @param store mémoire stable ; si elle contient un état, le philosophe reprend là où il s'était
+     *              arrêté au lieu de se croire de nouveau détenteur de sa fourchette
+     */
+    public TokenNode(int id, int count, LamportClock clock, PeerTransport transport, TokenStateStore store) {
         if (count < 2) {
             throw new IllegalArgumentException("Le protocole demande au moins 2 philosophes");
         }
@@ -88,8 +103,44 @@ public class TokenNode {
         this.count = count;
         this.clock = clock;
         this.transport = transport;
-        held.put(id, 0L); // chaque philosophe gère au départ sa propre fourchette
-        lastVersion.put(id, 0L);
+        this.store = store;
+        Optional<TokenStateStore.State> saved = store.load();
+        if (saved.isPresent()) {
+            TokenStateStore.State previous = saved.get();
+            clock.update(previous.clock());
+            sequence = previous.sequence();
+            held.putAll(previous.held());
+            lastVersion.putAll(previous.lastVersion());
+            previous.inFlight().forEach(outgoing -> inFlight.put(outgoing.token().fork(), outgoing));
+            // La demande en cours au moment de la panne (repas compris) est abandonnée.
+            completed.put(id, previous.sequence());
+        } else {
+            held.put(id, 0L); // tout premier démarrage : chacun gère sa propre fourchette
+            lastVersion.put(id, 0L);
+            persist();
+        }
+    }
+
+    /**
+     * À appeler une fois au démarrage, quand le réseau est prêt. Après une panne : renvoie les
+     * jetons dont l'envoi n'avait pas été acquitté et annonce l'abandon de la demande interrompue.
+     */
+    public void recover() {
+        List<Runnable> outbox = new ArrayList<>();
+        lock.lock();
+        try {
+            for (Outgoing outgoing : inFlight.values()) {
+                Messages.Token token = outgoing.token();
+                outbox.add(() -> transport.sendToken(outgoing.to(), token,
+                        () -> acknowledged(token.fork(), token.version())));
+            }
+            if (sequence > 0) {
+                broadcastRelease(sequence, outbox);
+            }
+        } finally {
+            lock.unlock();
+        }
+        outbox.forEach(Runnable::run);
     }
 
     /**
@@ -110,12 +161,14 @@ public class TokenNode {
                 throw new IllegalStateException("Une demande est déjà en cours");
             }
             current = new ForkRequest(id, ++sequence, clock.tick(), forks);
+            dirty = true;
             pending.add(current);
             state = State.WAITING;
             granted = new CompletableFuture<>();
             result = granted;
             broadcastRequest(outbox);
             evaluate(outbox);
+            persistIfDirty();
         } finally {
             lock.unlock();
         }
@@ -136,22 +189,16 @@ public class TokenNode {
             }
             long finished = current.sequence();
             completed.put(id, finished);
+            dirty = true;
             pending.remove(current);
             current = null;
             state = State.IDLE;
             if (!granted.isDone()) {
                 granted.cancel(false);
             }
-            long now = clock.tick();
-            for (int peer = 0; peer < count; peer++) {
-                if (peer != id) {
-                    int to = peer;
-                    Messages.Release message = new Messages.Release(id, finished, now);
-                    outbox.add(() -> transport.sendRelease(to, message));
-                    messagesSent.incrementAndGet();
-                }
-            }
+            broadcastRelease(finished, outbox);
             evaluate(outbox);
+            persistIfDirty();
         } finally {
             lock.unlock();
         }
@@ -190,6 +237,7 @@ public class TokenNode {
             pending.removeIf(known -> known.philosopherId() == from && known.sequence() < request.sequence());
             pending.add(request);
             evaluate(outbox);
+            persistIfDirty();
         } finally {
             lock.unlock();
         }
@@ -204,13 +252,17 @@ public class TokenNode {
             clock.update(message.senderClock());
             forget(message.philosopherId(), message.sequence());
             evaluate(outbox);
+            persistIfDirty();
         } finally {
             lock.unlock();
         }
         outbox.forEach(Runnable::run);
     }
 
-    /** Réception du jeton d'une fourchette. */
+    /**
+     * Réception du jeton d'une fourchette. Quand cette méthode rend la main, le jeton est
+     * enregistré en mémoire stable : l'émetteur peut être acquitté.
+     */
     public void onToken(Messages.Token message) {
         List<Runnable> outbox = new ArrayList<>();
         lock.lock();
@@ -222,11 +274,28 @@ public class TokenNode {
             }
             lastVersion.put(message.fork(), message.version());
             held.put(message.fork(), message.version());
+            dirty = true;
             evaluate(outbox);
+            persistIfDirty();
         } finally {
             lock.unlock();
         }
         outbox.forEach(Runnable::run);
+    }
+
+    /** Le destinataire a confirmé la réception du jeton : il n'est plus « en vol ». */
+    private void acknowledged(int fork, long version) {
+        lock.lock();
+        try {
+            Outgoing outgoing = inFlight.get(fork);
+            if (outgoing != null && outgoing.token().version() == version) {
+                inFlight.remove(fork);
+                dirty = true;
+                persistIfDirty();
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     /** Oublie les demandes de {@code philosopher} jusqu'au numéro {@code upTo} : elles sont terminées. */
@@ -239,12 +308,22 @@ public class TokenNode {
     }
 
     private void broadcastRequest(List<Runnable> outbox) {
-        long now = clock.tick();
-        Messages.Request message = new Messages.Request(current, now, completed.getOrDefault(id, 0L));
+        Messages.Request message = new Messages.Request(current, clock.tick(), completed.getOrDefault(id, 0L));
         for (int peer = 0; peer < count; peer++) {
             if (peer != id) {
                 int to = peer;
                 outbox.add(() -> transport.sendRequest(to, message));
+                messagesSent.incrementAndGet();
+            }
+        }
+    }
+
+    private void broadcastRelease(long finishedSequence, List<Runnable> outbox) {
+        Messages.Release message = new Messages.Release(id, finishedSequence, clock.tick());
+        for (int peer = 0; peer < count; peer++) {
+            if (peer != id) {
+                int to = peer;
+                outbox.add(() -> transport.sendRelease(to, message));
                 messagesSent.incrementAndGet();
             }
         }
@@ -268,7 +347,9 @@ public class TokenNode {
             int to = best.philosopherId();
             Messages.Token message = new Messages.Token(fork, version, id, clock.tick(),
                     completed.getOrDefault(id, 0L));
-            outbox.add(() -> transport.sendToken(to, message));
+            inFlight.put(fork, new Outgoing(to, message));
+            dirty = true;
+            outbox.add(() -> transport.sendToken(to, message, () -> acknowledged(fork, version)));
             messagesSent.incrementAndGet();
             tokensSent.incrementAndGet();
         }
@@ -288,11 +369,26 @@ public class TokenNode {
         return null;
     }
 
+    /** Écrit l'état en mémoire stable avant que le moindre message ne parte (journalisation préalable). */
+    private void persistIfDirty() {
+        if (dirty) {
+            persist();
+        }
+    }
+
+    private void persist() {
+        dirty = false;
+        store.save(new TokenStateStore.State(clock.current(), sequence, completed.getOrDefault(id, 0L),
+                new TreeMap<>(held), new TreeMap<>(lastVersion), List.copyOf(inFlight.values())));
+    }
+
     public Snapshot snapshot() {
         lock.lock();
         try {
-            return new Snapshot(id, state, clock.current(), new TreeMap<>(held), List.copyOf(pending), current,
-                    messagesSent.get(), tokensSent.get());
+            Map<Integer, Integer> flying = new TreeMap<>();
+            inFlight.forEach((fork, outgoing) -> flying.put(fork, outgoing.to()));
+            return new Snapshot(id, state, clock.current(), new TreeMap<>(held), flying, List.copyOf(pending),
+                    current, messagesSent.get(), tokensSent.get());
         } finally {
             lock.unlock();
         }

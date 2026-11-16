@@ -88,8 +88,11 @@ class InMemoryNetwork implements AutoCloseable {
         }
 
         @Override
-        public void sendToken(int to, Messages.Token message) {
-            deliver(() -> nodes.get(to).onToken(message), false);
+        public void sendToken(int to, Messages.Token message, Runnable acknowledged) {
+            deliver(() -> {
+                nodes.get(to).onToken(message);
+                acknowledged.run();
+            }, false);
         }
     }
 

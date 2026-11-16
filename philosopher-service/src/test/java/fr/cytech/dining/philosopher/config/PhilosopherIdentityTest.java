@@ -10,7 +10,7 @@ class PhilosopherIdentityTest {
     private static PhilosopherProperties properties(int id) {
         return new PhilosopherProperties(id, 5, Mode.SPOILED, false, 0, 0, 0, 0, "http://monitor",
                 "http://supervisor", "none", "topic", "http://philosopher-{id}:{port}", 8081, "zk:2181",
-                1000, 1000, 10);
+                1000, 1000, 10, "");
     }
 
     @Test
