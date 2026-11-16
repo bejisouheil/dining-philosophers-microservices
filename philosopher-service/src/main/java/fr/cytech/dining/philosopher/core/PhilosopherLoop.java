@@ -72,6 +72,11 @@ public class PhilosopherLoop {
                 .register(registry);
     }
 
+    /** Annonce au moniteur que le service (re)démarre, avant toute autre activité. */
+    public void announceStart() {
+        emit(EventType.STARTED);
+    }
+
     public synchronized void start() {
         if (running) {
             return;

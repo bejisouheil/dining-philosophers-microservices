@@ -1,0 +1,24 @@
+# Configuration partagée par tous les services, injectée en variables d'environnement.
+# Pour changer de variante : modifier PHILOSOPHER_MODE puis
+#   kubectl apply -k k8s && kubectl -n dining rollout restart statefulset/philosopher
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dining-config
+data:
+  # spoiled, supervised-naive, supervised-unsafe, supervised-locked, token ou zookeeper
+  PHILOSOPHER_MODE: token
+  # Doit être égal au nombre de réplicas du StatefulSet « philosopher ».
+  PHILOSOPHER_COUNT: "5"
+  SUPERVISOR_FORKS: "5"
+  # Chaque pod d'un StatefulSet a un nom DNS stable : philosopher-3.philosopher
+  PHILOSOPHER_PEER_URL_TEMPLATE: http://philosopher-{id}.philosopher:8081
+  PHILOSOPHER_MONITOR_URL: http://monitor:8090
+  PHILOSOPHER_SUPERVISOR_URL: http://supervisor:8080
+  PHILOSOPHER_ZOOKEEPER_CONNECT: zookeeper:2181
+  PHILOSOPHER_EVENTS_TRANSPORT: kafka
+  PHILOSOPHER_STATE_DIR: /data
+  MONITOR_KAFKA_ENABLED: "true"
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  # Journaux JSON structurés, exploitables par un agrégateur (Loki, Elastic...).
+  LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs

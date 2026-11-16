@@ -2,6 +2,8 @@ package fr.cytech.dining.philosopher.config;
 
 import java.time.Duration;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -33,6 +35,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 @Configuration
 @EnableConfigurationProperties(PhilosopherProperties.class)
 public class PhilosopherConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(PhilosopherConfiguration.class);
 
     @Bean
     PhilosopherIdentity philosopherIdentity(PhilosopherProperties properties, Environment environment) {
@@ -100,12 +104,45 @@ public class PhilosopherConfiguration {
                 clock, timing, registry);
     }
 
+    /**
+     * Séquence de démarrage, dans cet ordre précis :
+     * <ol>
+     *   <li>recaler l'horloge de Lamport sur la plus grande date connue du moniteur, pour que les
+     *       événements d'après un redémarrage soient datés après ceux d'avant ;</li>
+     *   <li>annoncer le démarrage (événement STARTED) ;</li>
+     *   <li>reprise du protocole par jetons après une panne ;</li>
+     *   <li>lancer la boucle penser/manger.</li>
+     * </ol>
+     */
     @Bean
-    ApplicationListener<ApplicationReadyEvent> autoStart(PhilosopherProperties properties, PhilosopherLoop loop) {
+    ApplicationListener<ApplicationReadyEvent> startup(PhilosopherProperties properties, PhilosopherLoop loop,
+                                                       LamportClock clock, ObjectProvider<TokenNode> tokenNode) {
         return event -> {
+            synchronizeClockWithMonitor(properties, clock);
+            loop.announceStart();
+            tokenNode.ifAvailable(TokenNode::recover);
             if (properties.autoStart()) {
                 loop.start();
             }
         };
+    }
+
+    private record MonitorClock(long lamportTime) {
+    }
+
+    private static void synchronizeClockWithMonitor(PhilosopherProperties properties, LamportClock clock) {
+        if ("none".equalsIgnoreCase(properties.eventsTransport())) {
+            return; // aucun moniteur dans cette configuration
+        }
+        try {
+            MonitorClock monitor = HttpSupport.restClient(properties.monitorUrl(),
+                            Duration.ofMillis(properties.requestTimeoutMs()))
+                    .get().uri("/api/clock").retrieve().body(MonitorClock.class);
+            if (monitor != null) {
+                clock.update(monitor.lamportTime());
+            }
+        } catch (RuntimeException e) {
+            log.info("Moniteur injoignable au démarrage : horloge non recalée ({})", e.getMessage());
+        }
     }
 }

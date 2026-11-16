@@ -106,6 +106,14 @@ class PhilosopherLoopTest {
     }
 
     @Test
+    void leDemarrageEstAnnonceAuMoniteur() throws InterruptedException {
+        loop.announceStart();
+
+        verify(publisher).publish(eventOfType(EventType.STARTED));
+        verify(strategy, never()).acquire();
+    }
+
+    @Test
     void demarrerPuisArreterLaBoucle() throws InterruptedException {
         loop.start();
         loop.start(); // sans effet : déjà démarrée

@@ -1,0 +1,13 @@
+# Déploie tout le système :  kubectl apply -k k8s
+# Supprime tout :            kubectl delete -k k8s
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dining
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - zookeeper.yaml
+  - kafka.yaml
+  - monitor.yaml
+  - supervisor.yaml
+  - philosopher.yaml

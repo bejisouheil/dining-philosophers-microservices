@@ -52,18 +52,19 @@ class SystemScenariosTest {
                 cluster.control(id, "start"); // tout le monde à table en même temps
             }
 
-            await().atMost(PATIENCE).untilAsserted(() -> {
-                for (int id = 0; id < cluster.count(); id++) {
-                    assertThat(cluster.state(id).state()).isEqualTo(PhilosopherLoop.State.HUNGRY);
-                }
-            });
+            // L'interblocage : chaque philosophe i tient la fourchette i et attend la suivante.
+            String everyoneHoldsTheirFirstFork = "\"naive\":{\"0\":0,\"1\":1,\"2\":2,\"3\":3,\"4\":4}";
+            await().atMost(PATIENCE).untilAsserted(
+                    () -> assertThat(cluster.supervisorForks()).contains(everyoneHoldsTheirFirstFork));
 
-            // Chacun tient sa première fourchette et attend la seconde : plus rien ne bouge.
+            // Une fois dans cet état, plus rien ne bouge : personne ne rend ce qu'il tient.
             long[] mealsWhenStuck = cluster.meals();
             Thread.sleep(1500);
             assertThat(cluster.meals()).as("plus personne ne mange").isEqualTo(mealsWhenStuck);
-            assertThat(cluster.supervisorForks())
-                    .contains("\"naive\":{\"0\":0,\"1\":1,\"2\":2,\"3\":3,\"4\":4}");
+            assertThat(cluster.supervisorForks()).contains(everyoneHoldsTheirFirstFork);
+            for (int id = 0; id < cluster.count(); id++) {
+                assertThat(cluster.state(id).state()).isEqualTo(PhilosopherLoop.State.HUNGRY);
+            }
         }
     }
 

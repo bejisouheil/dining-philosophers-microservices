@@ -65,6 +65,16 @@ class MonitorServiceApplicationTests {
     }
 
     @Test
+    void leMoniteurDonneLaPlusGrandeDateDeLamportConnue() {
+        post(new PhilosopherEvent(1, EventType.HUNGRY, 42, 1, 1_000, List.of(), "spoiled"));
+        post(new PhilosopherEvent(0, EventType.HUNGRY, 7, 1, 1_000, List.of(), "spoiled"));
+
+        String clock = client.get().uri("/api/clock").retrieve().body(String.class);
+
+        assertThat(clock).isEqualTo("{\"lamportTime\":42}");
+    }
+
+    @Test
     void leTableauDeBordEstServiALaRacine() {
         String html = client.get().uri("/").retrieve().body(String.class);
         assertThat(html).contains("Dîner des philosophes");

@@ -36,6 +36,13 @@ public class SnapshotService {
             p.lamportTime = event.lamportTime();
             p.forks = event.forks();
             switch (event.type()) {
+                case STARTED -> {
+                    // (Re)démarrage : le philosophe pense et ne tient plus rien, même s'il a été
+                    // interrompu en plein repas sans avoir pu émettre DONE.
+                    p.state = "THINKING";
+                    p.hungrySince = 0;
+                    forkHolder.values().removeIf(holder -> holder == event.philosopherId());
+                }
                 case HUNGRY -> {
                     p.state = "HUNGRY";
                     p.hungrySince = event.wallClockMillis();

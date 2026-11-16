@@ -50,6 +50,15 @@ public class EventStore {
         return sorted;
     }
 
+    /** Plus grande date de Lamport reçue : un philosophe qui redémarre s'y recale. */
+    public synchronized long maxLamportTime() {
+        long max = 0;
+        for (PhilosopherEvent event : events) {
+            max = Math.max(max, event.lamportTime());
+        }
+        return max;
+    }
+
     public synchronized int size() {
         return events.size();
     }

@@ -48,6 +48,15 @@ public class MonitorController {
         return history.stream().filter(event -> event.philosopherId() == philosopher).toList();
     }
 
+    /** Horloge du moniteur : la plus grande date de Lamport qu'il a vue passer. */
+    public record ClockView(long lamportTime) {
+    }
+
+    @GetMapping("/api/clock")
+    public ClockView clock() {
+        return new ClockView(store.maxLamportTime());
+    }
+
     /** Remet le moniteur à zéro (pratique entre deux démonstrations). */
     @DeleteMapping("/api/events")
     @ResponseStatus(HttpStatus.NO_CONTENT)

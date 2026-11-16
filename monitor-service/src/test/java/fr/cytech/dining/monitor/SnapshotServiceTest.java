@@ -64,6 +64,19 @@ class SnapshotServiceTest {
     }
 
     @Test
+    void unPhilosopheTombeEnPanneEnMangeantPuisRedemarreNEstPasUneViolation() {
+        emit(0, EventType.EATING, 1_000, 0, 1); // panne ici : DONE ne sera jamais émis
+        emit(0, EventType.STARTED, 1_500, 0, 1); // redémarrage
+        emit(1, EventType.EATING, 1_600, 1, 2);
+
+        Snapshot snapshot = service.compute(history, 2_000);
+
+        assertThat(snapshot.violationCount()).isZero();
+        assertThat(snapshot.philosophers().get(0).state()).isEqualTo("THINKING");
+        assertThat(snapshot.philosophers().get(0).meals()).as("le repas interrompu ne compte pas").isZero();
+    }
+
+    @Test
     void deuxPhilosophesNonVoisinsPeuventMangerEnMemeTemps() {
         emit(0, EventType.EATING, 1_000, 0, 1);
         emit(2, EventType.EATING, 1_000, 2, 3);

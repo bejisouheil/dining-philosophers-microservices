@@ -1,0 +1,84 @@
+# Service « headless » : pas d'adresse unique, mais un nom DNS par pod (philosopher-0.philosopher...).
+apiVersion: v1
+kind: Service
+metadata:
+  name: philosopher
+spec:
+  clusterIP: None
+  # Les philosophes doivent pouvoir se joindre dès le démarrage, avant d'être déclarés prêts.
+  publishNotReadyAddresses: true
+  selector:
+    app: philosopher
+  ports:
+    - name: http
+      port: 8081
+---
+# StatefulSet plutôt que Deployment : chaque philosophe a besoin d'une identité stable
+# (philosopher-0 à philosopher-4, d'où il tire son identifiant) et d'un disque qui lui reste
+# attaché (l'état de ses jetons survit à un redémarrage du pod).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: philosopher
+spec:
+  serviceName: philosopher
+  replicas: 5
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: philosopher
+  template:
+    metadata:
+      labels:
+        app: philosopher
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8081"
+    spec:
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 20
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: philosopher
+          image: ghcr.io/bejisouheil/dining-philosophers-microservices/philosopher-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: dining-config
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: state
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: state
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 64Mi
