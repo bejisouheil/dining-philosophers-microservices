@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import fr.cytech.dining.common.LamportClock;
 import fr.cytech.dining.philosopher.core.ForkAssignment;
 
 /**
@@ -57,7 +58,7 @@ class ZooKeeperStrategyTest {
     }
 
     private ZooKeeperStrategy philosopher(int id) {
-        return new ZooKeeperStrategy(newClient(), ForkAssignment.forksFor(id, COUNT));
+        return new ZooKeeperStrategy(newClient(), ForkAssignment.forksFor(id, COUNT), new LamportClock());
     }
 
     @Test
@@ -115,7 +116,8 @@ class ZooKeeperStrategyTest {
     @DisplayName("Résilience : si un philosophe tombe en panne en mangeant, ZooKeeper libère ses fourchettes")
     void unePanneLibereLesVerrous() throws Exception {
         CuratorFramework doomedClient = newClient();
-        ZooKeeperStrategy doomed = new ZooKeeperStrategy(doomedClient, ForkAssignment.forksFor(0, COUNT));
+        ZooKeeperStrategy doomed = new ZooKeeperStrategy(doomedClient, ForkAssignment.forksFor(0, COUNT),
+                new LamportClock());
         ZooKeeperStrategy neighbour = philosopher(1); // partage la fourchette 1
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try {
@@ -137,11 +139,29 @@ class ZooKeeperStrategyTest {
     }
 
     @Test
+    @DisplayName("L'horloge de Lamport voyage par ZooKeeper : qui prend une fourchette est daté après qui l'a rendue")
+    void lHorlogeTraverseZooKeeper() throws Exception {
+        LamportClock clockOfZero = new LamportClock();
+        LamportClock clockOfOne = new LamportClock();
+        ZooKeeperStrategy zero = new ZooKeeperStrategy(newClient(), ForkAssignment.forksFor(0, COUNT), clockOfZero);
+        ZooKeeperStrategy one = new ZooKeeperStrategy(newClient(), ForkAssignment.forksFor(1, COUNT), clockOfOne);
+        clockOfZero.update(1_000); // le philosophe 0 a une horloge très en avance
+
+        zero.acquire();
+        zero.release();
+        long releasedAt = clockOfZero.current();
+        one.acquire(); // partage la fourchette 1 avec le philosophe 0
+
+        assertThat(clockOfOne.current()).isGreaterThan(releasedAt);
+        one.release();
+    }
+
+    @Test
     void lesFourchettesDoiventEtreTrieesPourGarantirLOrdreDePrise() {
         CuratorFramework client = newClient();
-        assertThatThrownBy(() -> new ZooKeeperStrategy(client, List.of(4, 0)))
+        assertThatThrownBy(() -> new ZooKeeperStrategy(client, List.of(4, 0), new LamportClock()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new ZooKeeperStrategy(client, List.of(1)))
+        assertThatThrownBy(() -> new ZooKeeperStrategy(client, List.of(1), new LamportClock()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

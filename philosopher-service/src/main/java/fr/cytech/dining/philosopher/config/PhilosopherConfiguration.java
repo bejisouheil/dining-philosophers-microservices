@@ -70,7 +70,7 @@ public class PhilosopherConfiguration {
             case TOKEN -> new TokenStrategy(tokenNode.getObject(), ForkAssignment.forksFor(id, count),
                     properties.retransmitMs());
             case ZOOKEEPER -> ZooKeeperStrategy.connect(properties.zookeeperConnect(),
-                    ForkAssignment.forksFor(id, count));
+                    ForkAssignment.forksFor(id, count), clock);
         };
     }
 

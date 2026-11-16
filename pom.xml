@@ -23,6 +23,7 @@
         <module>philosopher-service</module>
         <module>monitor-service</module>
         <module>supervisor-service</module>
+        <module>system-tests</module>
     </modules>
 
     <properties>
@@ -63,6 +64,22 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Le jar executable porte le suffixe -exec : le jar simple reste utilisable
+                     comme dependance par le module system-tests. -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <classifier>exec</classifier>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
     <dependencies>
         <dependency>
