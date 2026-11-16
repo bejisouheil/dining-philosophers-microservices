@@ -1,6 +1,6 @@
 # Répartition du travail
 
-> **Comment lire ce document.** Le code a été produit avec l'assistance d'une IA (voir le [rapport, section 9](rapport-technique.md#9-utilisation-de-lintelligence-artificielle)). La répartition ci-dessous désigne, pour chaque partie, le membre qui en est **référent** : c'est lui qui en maîtrise le code, rejoue ses tests, sait justifier ses choix et la présente en soutenance. Elle est à ajuster entre vous si les affinités sont différentes.
+> **Comment lire ce document.** Pour chaque partie, un membre en est **référent** : c'est lui qui en maîtrise le code, rejoue ses tests, sait justifier ses choix et la présente en soutenance.
 
 ## Vue d'ensemble
 

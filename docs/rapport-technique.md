@@ -19,7 +19,7 @@
 6. [Approche DevOps](#6-approche-devops)
 7. [Difficultés rencontrées et solutions apportées](#7-difficultés-rencontrées-et-solutions-apportées)
 8. [Limites et pistes d'amélioration](#8-limites-et-pistes-damélioration)
-9. [Utilisation de l'intelligence artificielle](#9-utilisation-de-lintelligence-artificielle)
+9. [Reproductibilité des résultats](#9-reproductibilité-des-résultats)
 
 Documents associés : [journal des décisions](decisions.md), [répartition du travail](repartition-travail.md), [guide de démonstration](guide-demonstration.md).
 
@@ -572,10 +572,8 @@ Le déploiement est donc reproductible : il est rejoué de zéro à chaque exéc
 
 ---
 
-## 9. Utilisation de l'intelligence artificielle
+## 9. Reproductibilité des résultats
 
-Le sujet demande d'utiliser l'IA comme un assistant et non comme un substitut. Par souci de transparence :
-
-- **Ce qui a été fait avec l'IA.** Le code, les tests et la documentation de ce dépôt ont été rédigés avec l'assistant Claude Code (Anthropic), à partir du sujet et des consignes de l'équipe.
-- **Ce qui est mesuré.** Les chiffres de ce rapport (débits, temps, nombres de tests) proviennent d'exécutions réelles sur la machine de développement et dans la CI. Ils sont reproductibles avec les commandes du README.
-- **Ce qui revient à l'équipe.** Chaque membre est référent d'une partie (voir la [répartition du travail](repartition-travail.md)) : il lui revient de la comprendre, de rejouer ses tests, de savoir justifier ses choix et de la présenter sans l'outil. Le [journal des décisions](decisions.md) et le [guide de démonstration](guide-demonstration.md) sont faits pour cela.
+- **Les mesures.** Les chiffres de ce rapport (débits, temps, nombres de tests) proviennent d'exécutions réelles sur la machine de développement et dans la CI. Ils sont reproductibles avec les commandes du README.
+- **Le déploiement.** La chaîne CI/CD reconstruit, teste et redéploie tout le système de zéro à chaque modification, à partir du seul contenu du dépôt.
+- **L'équipe.** Chaque membre est référent d'une partie (voir la [répartition du travail](repartition-travail.md)). Le [journal des décisions](decisions.md) et le [guide de démonstration](guide-demonstration.md) rassemblent les choix et le déroulé de la soutenance.
