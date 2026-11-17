@@ -56,7 +56,7 @@ Le même `philosopher-service` exécute les six variantes du sujet. On choisit a
 
 ### Le plus rapide sous Windows : un seul script
 
-Après un `git clone`, double-cliquer sur `setup-and-run.cmd` (ou, dans un terminal du dépôt, `.\scripts\setup-and-run.ps1`). Le script vérifie Git et Java 21, les installe via `winget` s'ils manquent, compile, démarre le système et ouvre le tableau de bord. Options : `-Mode <variante>`, `-Test` (lance aussi les 179 tests), `-Docker` (utilise Docker Compose).
+Après un `git clone`, double-cliquer sur `setup-and-run.cmd` (ou, dans un terminal du dépôt, `powershell -ExecutionPolicy Bypass -File .\scripts\setup-and-run.ps1`, qui évite le blocage « exécution de scripts désactivée »). Le script vérifie Git et Java 21, les installe via `winget` s'ils manquent, compile, démarre le système et ouvre le tableau de bord. Options : `-Mode <variante>`, `-Test` (lance aussi les 179 tests), `-Docker` (utilise Docker Compose).
 
 
 **Prérequis :** JDK 21 et Git. Maven n'est pas nécessaire, le wrapper `mvnw` l'installe tout seul. Docker est nécessaire pour Docker Compose et pour les tests ZooKeeper et Kafka.
